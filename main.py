@@ -1,3 +1,4 @@
+import base64
 import io
 import os
 import re
@@ -72,13 +73,22 @@ def run_download(url, folder):
     # YouTube turli server IP/client kombinatsiyalariga turlicha javob beradi.
     client_profiles = ["android_vr", "ios", "web_safari", "mweb", "tv", "default"]
     errors = []
+    cookie_arg = []
+    encoded_cookies = os.environ.get("YOUTUBE_COOKIES_B64", "").strip()
+    if encoded_cookies:
+        try:
+            cookie_file = Path(folder) / "youtube-cookies.txt"
+            cookie_file.write_bytes(base64.b64decode(encoded_cookies, validate=True))
+            cookie_arg = ["--cookies", str(cookie_file)]
+        except Exception as exc:
+            raise RuntimeError("YOUTUBE_COOKIES_B64 Render secreti noto‘g‘ri formatda") from exc
     for player_client in client_profiles:
         command = [
             "yt-dlp", "--no-playlist", "--no-warnings", "--socket-timeout", "30",
             "--retries", "2", "--extract-audio", "--audio-format", "mp3",
             "--audio-quality", "7", "-f", "bestaudio/best", "--remote-components", "ejs:github",
             "--js-runtimes", "deno", "--extractor-args", f"youtube:player_client={player_client}",
-            "--ffmpeg-location", ffmpeg_path(), "--match-filter",
+            *cookie_arg, "--ffmpeg-location", ffmpeg_path(), "--match-filter",
             f"duration <= {MAX_DURATION_SECONDS}", "-o", output, url,
         ]
         result = subprocess.run(command, cwd=folder, text=True, capture_output=True, timeout=300)
