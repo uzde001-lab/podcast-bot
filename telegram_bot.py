@@ -106,16 +106,40 @@ def setup_cookies() -> None:
 
 
 # ---------------------- BAZA ----------------------
-db = sqlite3.connect(DB_PATH, check_same_thread=False)
-db.executescript("""
+DB_SCHEMA = """
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, name TEXT, lang TEXT DEFAULT 'auto', joined TEXT);
 CREATE TABLE IF NOT EXISTS usage(user_id INTEGER, day TEXT, n INTEGER, PRIMARY KEY(user_id, day));
 CREATE TABLE IF NOT EXISTS cache(video_id TEXT, lang TEXT, title TEXT, duration INTEGER,
                                  segments TEXT, summary TEXT, PRIMARY KEY(video_id, lang));
 CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER,
                                 video_id TEXT, fmt TEXT, minutes REAL, day TEXT);
-""")
-db.commit()
+"""
+
+
+def _connect_database():
+    connection = sqlite3.connect(DB_PATH, check_same_thread=False)
+    connection.executescript(DB_SCHEMA)
+    connection.commit()
+    return connection
+
+
+db = _connect_database()
+
+
+def reinitialize_process_state() -> None:
+    """Reopen process-bound clients after Gunicorn forks a WSGI worker."""
+    global db, bot, groq, job_sem, chunk_sem, active, pending
+    try:
+        db.close()
+    except sqlite3.Error:
+        pass
+    db = _connect_database()
+    bot = Bot(BOT_TOKEN)
+    groq = Groq(api_key=GROQ_API_KEY, max_retries=0)
+    job_sem = asyncio.Semaphore(MAX_PARALLEL_JOBS)
+    chunk_sem = asyncio.Semaphore(PARALLEL_CHUNKS)
+    active = set()
+    pending = {}
 
 
 def touch_user(u) -> None:

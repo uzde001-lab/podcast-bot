@@ -14,6 +14,8 @@ log = logging.getLogger("render-webhook")
 _bot_loop = None
 _bot_ready = threading.Event()
 _startup_error = None
+_worker_lock = threading.Lock()
+_worker_thread = None
 
 
 def _finish_update(future):
@@ -30,12 +32,13 @@ def _run_aiogram_loop():
     _bot_loop = loop
     asyncio.set_event_loop(loop)
     try:
+        telegram_bot.reinitialize_process_state()
         loop.run_until_complete(telegram_bot.configure_bot())
         _bot_ready.set()
         loop.run_forever()
     except Exception as exc:
         _startup_error = type(exc).__name__
-        log.exception("Telegram bot startup failed (%s)", _startup_error)
+        log.error("Telegram bot startup failed (%s)", _startup_error)
     finally:
         if not loop.is_closed():
             pending = asyncio.all_tasks(loop)
@@ -48,6 +51,29 @@ def _run_aiogram_loop():
             except Exception:
                 pass
             loop.close()
+
+
+def _start_bot_worker():
+    global _worker_thread, _startup_error
+    if os.getenv("DISABLE_BOT_WORKER") == "1":
+        return
+    with _worker_lock:
+        if _worker_thread is not None and _worker_thread.is_alive():
+            return
+        _bot_ready.clear()
+        _startup_error = None
+        _worker_thread = threading.Thread(
+            target=_run_aiogram_loop,
+            name="aiogram-webhook-loop",
+            daemon=True,
+        )
+        _worker_thread.start()
+
+
+@app.before_request
+def start_bot_after_worker_fork():
+    # Starting only after the first request keeps Gunicorn preload/fork safe.
+    _start_bot_worker()
 
 
 @app.get("/")
@@ -88,11 +114,3 @@ def telegram_webhook():
         log.warning("Telegram update could not be queued (%s)", type(exc).__name__)
         return jsonify(ok=False, error="queue_failed"), 503
     return jsonify(ok=True), 200
-
-
-if os.getenv("DISABLE_BOT_WORKER") != "1":
-    threading.Thread(
-        target=_run_aiogram_loop,
-        name="aiogram-webhook-loop",
-        daemon=True,
-    ).start()
