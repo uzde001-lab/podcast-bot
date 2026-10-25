@@ -81,7 +81,7 @@ def run_download(url, folder):
             "--ffmpeg-location", ffmpeg_path(), "--match-filter",
             f"duration <= {MAX_DURATION_SECONDS}", "-o", output, url,
         ]
-        result = subprocess.run(command, cwd=folder, text=True, capture_output=True, timeout=900)
+        result = subprocess.run(command, cwd=folder, text=True, capture_output=True, timeout=300)
         files = list(Path(folder).glob("audio.*"))
         if result.returncode == 0 and files:
             return files[0]
