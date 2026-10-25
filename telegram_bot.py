@@ -213,6 +213,11 @@ def friendly_error(e: Exception) -> str:
         return ("YouTube serverni vaqtincha blokladi.\n"
                 "Admin: YT_PROXY yoki cookies (YT_COOKIES_B64) sozlashi kerak. "
                 "Hozircha videoning audiosini shu yerga fayl qilib yuborishingiz mumkin (20 MB gacha).")
+    if "failed to extract any player response" in low or "unable to extract initial player response" in low:
+        return ("YouTube bu videoni bot serveriga ochib bermadi; bu ko‘pincha YouTube cheklovi yoki "
+                "video ruxsatiga bog‘liq. Bot egasi Render → Environment’da ruxsatli YT_PROXY yoki "
+                "YT_COOKIES_B64 sozlashi kerak. Cookie maxfiy: chatga yubormang, akkauntga xavf tug‘dirishi mumkin. "
+                "Hozircha audio/video faylni Telegram orqali yuboring (20 MB gacha).")
     if "private video" in low:
         return "Bu video yopiq (private)."
     if "unavailable" in low or "removed" in low:
