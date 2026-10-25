@@ -69,23 +69,29 @@ def ffmpeg_path():
 
 def run_download(url, folder):
     output = str(Path(folder) / "audio.%(ext)s")
-    command = [
-        "yt-dlp", "--no-playlist", "--no-warnings", "--socket-timeout", "30",
-        "--retries", "2", "--extract-audio", "--audio-format", "mp3",
-        "--audio-quality", "7", "-f", "bestaudio/best", "--remote-components", "ejs:github",
-        "--js-runtimes", "deno", "--ffmpeg-location", ffmpeg_path(), "--match-filter",
-        f"duration <= {MAX_DURATION_SECONDS}", "-o", output, url,
-    ]
-    result = subprocess.run(command, cwd=folder, text=True, capture_output=True, timeout=900)
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout)[-1800:]
-        if "Sign in to confirm" in detail:
-            raise RuntimeError("YouTube server avtomatik yuklashni blokladi. Video/audio faylni Telegramga to‘g‘ridan-to‘g‘ri yuboring.")
-        raise RuntimeError(f"YouTube yuklash xatosi: {detail}")
-    files = list(Path(folder).glob("audio.*"))
-    if not files:
-        raise RuntimeError("YouTube audiosi olinmadi")
-    return files[0]
+    # YouTube turli server IP/client kombinatsiyalariga turlicha javob beradi.
+    client_profiles = ["web_safari", "mweb", "tv", "default"]
+    errors = []
+    for player_client in client_profiles:
+        command = [
+            "yt-dlp", "--no-playlist", "--no-warnings", "--socket-timeout", "30",
+            "--retries", "2", "--extract-audio", "--audio-format", "mp3",
+            "--audio-quality", "7", "-f", "bestaudio/best", "--remote-components", "ejs:github",
+            "--js-runtimes", "deno", "--extractor-args", f"youtube:player_client={player_client}",
+            "--ffmpeg-location", ffmpeg_path(), "--match-filter",
+            f"duration <= {MAX_DURATION_SECONDS}", "-o", output, url,
+        ]
+        result = subprocess.run(command, cwd=folder, text=True, capture_output=True, timeout=900)
+        files = list(Path(folder).glob("audio.*"))
+        if result.returncode == 0 and files:
+            return files[0]
+        detail = (result.stderr or result.stdout or "no response")[-1000:]
+        errors.append(f"{player_client}: {detail}")
+
+    detail = errors[-1] if errors else "no response"
+    if any("Sign in to confirm" in error or "Failed to extract any player response" in error for error in errors):
+        raise RuntimeError("YouTube Render serveriga player javobini bermadi. Deno/EJS va alternativ clientlar ham sinandi. Audio/video faylni Telegramga yuboring yoki shu videoning subtitrli nusxasidan foydalaning.")
+    raise RuntimeError(f"YouTube yuklash xatosi: {detail}")
 
 
 def telegram_file(file_id, folder, filename="media.bin"):
