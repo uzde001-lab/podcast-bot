@@ -72,8 +72,9 @@ def run_download(url, folder):
     command = [
         "yt-dlp", "--no-playlist", "--no-warnings", "--socket-timeout", "30",
         "--retries", "2", "--extract-audio", "--audio-format", "mp3",
-        "--audio-quality", "7", "-f", "bestaudio/best", "--ffmpeg-location",
-        ffmpeg_path(), "--match-filter", f"duration <= {MAX_DURATION_SECONDS}", "-o", output, url,
+        "--audio-quality", "7", "-f", "bestaudio/best", "--remote-components", "ejs:github",
+        "--js-runtimes", "deno", "--ffmpeg-location", ffmpeg_path(), "--match-filter",
+        f"duration <= {MAX_DURATION_SECONDS}", "-o", output, url,
     ]
     result = subprocess.run(command, cwd=folder, text=True, capture_output=True, timeout=900)
     if result.returncode != 0:
