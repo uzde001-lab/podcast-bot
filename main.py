@@ -70,7 +70,7 @@ def ffmpeg_path():
 def run_download(url, folder):
     output = str(Path(folder) / "audio.%(ext)s")
     # YouTube turli server IP/client kombinatsiyalariga turlicha javob beradi.
-    client_profiles = ["web_safari", "mweb", "tv", "default"]
+    client_profiles = ["android_vr", "ios", "web_safari", "mweb", "tv", "default"]
     errors = []
     for player_client in client_profiles:
         command = [
